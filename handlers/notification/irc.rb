@@ -34,7 +34,7 @@ class IRC < Sensu::Handler
   end
 
   def handle
-    timeout_length = settings["irc"]["timeout"] || 10
+    timeout_length = Integer(settings["irc"]["timeout"] || 10)
     params = {
       :uri => settings["irc"]["irc_server"],
       :message => "#{event_name}: #{@event['check']['output']}",
