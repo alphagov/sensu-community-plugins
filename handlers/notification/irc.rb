@@ -34,6 +34,7 @@ class IRC < Sensu::Handler
   end
 
   def handle
+    timeout_length = settings["irc"]["timeout"] || 10
     params = {
       :uri => settings["irc"]["irc_server"],
       :message => "#{event_name}: #{@event['check']['output']}",
@@ -51,7 +52,7 @@ class IRC < Sensu::Handler
     end
 
     begin
-      timeout(10) do
+      timeout(timeout_length) do
         CarrierPigeon.send(params)
         puts 'irc -- sent alert for ' + event_name + ' to IRC.'
       end
