@@ -85,30 +85,6 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
     :long => '--from FROM',
     :default => "-10mins"
 
-  option :username,
-    :description => 'Username to be used with basic auth',
-    :short => '-u USERNAME',
-    :long => '--username USERNAME',
-    :default => false 
-
-  option :password,
-    :description => 'Password to be used with basic auth',
-    :short => '-p PASSWORD',
-    :long => '--password PASSWORD',
-    :default => false 
-
-  option :ssl,
-    :description => 'Whether to use https',
-    :long => '--ssl',
-    :boolean => true,
-    :default => false
-
-  option :ssl_ignore_certs,
-    :description => 'Whether to ignore cert checking for SSL',
-    :long => '--ssl-ignore-certs',
-    :boolean => true,
-    :default => false
-
   option :ignore_no_data,
     :description => 'Whether to ignore no data error from Graphite',
     :long => '--ignore-no-data',
@@ -169,33 +145,6 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
   def retrieve_data
     unless @raw_data
       begin
-        protocol = config[:ssl] ? 'https' : 'http'
-        verify_mode = config[:ssl_ignore_certs] ? OpenSSL::SSL::VERIFY_NONE : OpenSSL::SSL::VERIFY_PEER 
-
-        if config[:username] != false && config[:password] != false
-          handle = open(protocol + "://#{config[:server]}/render?format=json&target=#{formatted_target}&from=#{config[:from]}",
-                       :ssl_verify_mode => verify_mode, :http_basic_authentication => [config[:username], config[:password]])
-        else
-          handle = open(protocol + "://#{config[:server]}/render?format=json&target=#{formatted_target}&from=#{config[:from]}",
-                       :ssl_verify_mode => verify_mode)
-        end
-
-        @raw_data = JSON.parse(handle.gets).first
-        @raw_data['datapoints'].delete_if{|v| v.first == nil}
-        @data = @raw_data['datapoints'].map(&:first)
-        @target = @raw_data['target']
-        @start = @raw_data['datapoints'].first.last
-        @end = @raw_data['datapoints'].last.last
-        @step = ((@end - @start) / @raw_data['datapoints'].size.to_f).ceil
-        nil
-      rescue OpenURI::HTTPError
-        if config[:ignore_http_error]
-          ok "HTTP error, but we don't mind"
-        else
-          critical "Failed to connect to graphite server"
-        end
-
-     # TODO  This was remote version.
         unless config[:server].start_with?('https://', 'http://')
           config[:server].prepend('http://')
         end
@@ -234,7 +183,11 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
         end
         output
       rescue OpenURI::HTTPError
-        unknown "Failed to connect to graphite server"
+        if config[:ignore_http_error]
+          ok "HTTP error, but we don't mind"
+        else
+          unknown "Failed to connect to graphite server"
+        end
       rescue NoMethodError
         if config[:ignore_no_data]
           ok "No data, but we don't mind"
@@ -289,14 +242,8 @@ class CheckGraphiteData < Sensu::Plugin::Check::CLI
       @formatted = Socket.gethostbyname(Socket.gethostname).first.gsub('.', config[:hostname_sub] || '_')
       config[:target].gsub('$', @formatted)
     else
-      config[:target]
+      URI.escape config[:target]
     end
-  end
-
-
-  def does_range_include?(range,value)
-    result = (range["min"].nil? || value >= range["min"]) && (range["max"].nil? || value <= range["max"])
-    range["inverse"] ? not(result) : result
   end
 
   def self.parse_range(string_range)
