@@ -39,6 +39,7 @@ class LogstashHandler < Sensu::Handler
       :@timestamp => time,
       :@version => 1,
       :source => ::Socket.gethostname,
+      :type => settings['logstash']['type'],
       :tags => ["sensu-#{action_to_string}"],
       :message => @event['check']['output'],
       :host          => @event['client']['name'],
